@@ -1,0 +1,34 @@
+QuestaSim vlog 10.6c Compiler 2017.07 Jul 25 2017
+Start time: 21:07:35 on May 11,2026
+vlog "+acc" "+cover" -l alu.log alu_tb.v ALU.v 
+-- Compiling module tb_alu
+** Warning: alu_tb.v(149): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(151): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(153): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(155): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(157): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(159): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(163): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(165): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(167): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(169): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(171): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(173): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(177): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(179): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(181): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(183): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(185): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(187): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(191): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(193): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(195): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(197): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(199): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+** Warning: alu_tb.v(201): (vlog-2600) [RDGN] - Redundant digits in numeric literal.
+-- Compiling module ALU
+
+Top level modules:
+	tb_alu
+End time: 21:07:35 on May 11,2026, Elapsed time: 0:00:00
+Errors: 0, Warnings: 24

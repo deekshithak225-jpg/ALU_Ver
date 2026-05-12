@@ -1,408 +1,354 @@
-module alu(INP_VALID,OPA,OPB,CIN,CLK,RST,CMD,CE,MODE,COUT,OFLOW,RES,G,E,L,ERR);
-parameter N=8;
+module ALU #(
+   parameter CMD_WIDTH = 4,
+   parameter WIDTH = 8
+)(
+   input  wire clk,rst,mode,ce,cin,
+   input  wire [1:0] inp_valid,
+   input  wire [CMD_WIDTH-1:0] cmd,
+   input  wire [WIDTH-1:0] op_a,op_b,
+   output reg signed [2*WIDTH-1:0] res,
+   output reg err,oflow,cout,g,l,e 
+);
 
-  input [1:0]INP_VALID;
-  input [N-1:0] OPA,OPB;
-  input CLK,RST,CE,MODE,CIN;
-  input [3:0] CMD;
-  output reg [2*N:0] RES ;
-  output reg COUT ;
-  output reg OFLOW;
-  output reg G ;
-  output reg E;
-  output reg L ;
-  output reg ERR ;
-  reg signed [N-1:0]s_OPA;
-  reg signed [N-1:0]s_OPB;
-  wire [N-1:0]SUM;
-  assign SUM=s_OPA+s_OPB;
-  wire [N-1:0]DIFF;
-  assign DIFF=s_OPA-s_OPB;
-  reg [N-1:0]pipe1_OPA_9,pipe1_OPB_9;
-  reg [N-1:0]pipe1_OPA_10,pipe1_OPB_10;
-  reg pipe1_valid_9, pipe1_valid_10;
-  reg [2*N-1:0] pipe2_product_9,pipe2_product_10;
-  reg pipe2_valid_9,pipe2_valid_10;
-  reg [2*N-1:0] pipe3_product_9,pipe3_product_10;
-  reg pipe3_valid_9,pipe3_valid_10;
-  always @(*)
-  begin
-    s_OPA=OPA;
-    s_OPB=OPB;
-  end
-  always@(posedge CLK or posedge RST)
-  begin
-    if(RST)
-    begin
-      pipe1_OPA_9<=0;pipe1_OPB_9<=0;pipe1_valid_9<= 0;
-      pipe1_OPA_10<=0;pipe1_OPB_10 <=0;pipe1_valid_10<=0;
-      pipe2_product_9<=0;pipe2_valid_9<=0;
-      pipe2_product_10<=0;pipe2_valid_10<=0;
-      pipe3_product_9<=0;pipe3_valid_9<=0;
-      pipe3_product_10<=0;pipe3_valid_10<=0;
+    wire clk_new;
+    reg start,done;
+    reg [WIDTH-1:0] temp_a, temp_b;
+    reg [CMD_WIDTH-1:0] prev_cmd;
+    reg of;
+
+    assign clk_new = clk & ce;
+
+    always @(posedge clk_new or posedge rst) begin
+        if (rst) begin
+            res <= 0;
+            err <= 0;
+            oflow <= 0;
+            cout <= 0;
+            g <= 0;
+            l <= 0;
+            e <= 0;
+            start <= 1;
+            done <= 0;
+            prev_cmd <= 14;
+        end
+        else begin
+            err <= 0;
+            oflow <= 0;
+            cout <= 0;
+            g <= 0;
+            l <= 0;
+            e <= 0;
+
+            prev_cmd <= cmd;
+
+            if(cmd != prev_cmd) begin
+                start = 1; 
+                done = 0; 
+            end 
+
+            if(mode) begin
+               case(cmd)
+                    0: begin
+                        if(inp_valid==2'b11) begin
+                            res <= op_a + op_b;
+                            cout <= res[WIDTH];
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    1: begin
+                        if(inp_valid==2'b11) begin
+                            res <= op_a - op_b;
+                            oflow <= (op_a < op_b);
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    2: begin
+                        if(inp_valid==2'b11) begin
+                            res <= op_a + op_b + cin;
+                            cout <= res[WIDTH];
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    3: begin
+                        if(inp_valid==2'b11) begin
+                            res <= op_a - op_b - cin;
+                            oflow <= (op_a < (op_b + cin));
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    4: begin
+                        if(inp_valid[0]) begin
+                            res <= op_a + 1'b1;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    5: begin
+                        if(inp_valid[0]) begin
+                            res <= op_a - 1'b1;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    6: begin
+                        if(inp_valid[1]) begin
+                            res <= op_b + 1'b1;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    7: begin
+                        if(inp_valid[1]) begin
+                            res <= op_b - 1'b1;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    8: begin
+                        if(inp_valid==2'b11) begin
+                            if (op_a > op_b)
+                                g <= 1;
+                            else if (op_a < op_b)
+                                l <= 1;
+                            else
+                                e <= 1;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    9: begin
+                        if(inp_valid==2'b11) begin
+                            if(start) begin
+                                temp_a <= op_a + 1'b1;
+                                temp_b <= op_b + 1'b1;
+                                start <= 0;
+                                done <= 1;
+                            end
+
+                            if(done) begin
+                                res <= temp_a * temp_b;
+                                done <= 0;
+                                start <= 1;
+                            end
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    10: begin
+                        if (inp_valid==2'b11) begin
+                            if(start) begin
+                                temp_a <= op_a << 1;
+                                temp_b <= op_b;
+                                start <= 0;
+                                done <= 1;
+                            end
+
+                            if(done) begin
+                                res <= temp_a * temp_b;
+                                done <= 0;
+                                start <= 1;
+                            end
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    11: begin
+                        if (inp_valid==2'b11) begin
+                            res <= $signed(op_a) + $signed(op_b);
+                            {g,l,e} <= ($signed(op_a) == $signed(op_b)) ? 3'b001 :
+                                       ($signed(op_a) > $signed(op_b)) ? 3'b100 :
+                                       3'b010;
+                            oflow <= of;
+                            {g,l,e} <= ($signed(op_a) == $signed(op_b)) ? 3'b001 :
+                                       ($signed(op_a) > $signed(op_b)) ? 3'b100 :
+                                       3'b010;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    12: begin
+                        if (inp_valid==2'b11) begin
+                            res <= $signed(op_a) - $signed(op_b);
+                            {g,l,e} <= ($signed(op_a) == $signed(op_b)) ? 3'b001 :
+                                       ($signed(op_a) > $signed(op_b)) ? 3'b100 :
+                                       3'b010;
+                            oflow <= of;
+                            {g,l,e} <= ($signed(op_a) == $signed(op_b)) ? 3'b001 :
+                                       ($signed(op_a) > $signed(op_b)) ? 3'b100 :
+                                       3'b010;
+                        end
+                        else
+                            err <= 1;
+                    end
+               endcase 
+            end
+            else begin
+                case (cmd)
+                    0: begin
+                        if(inp_valid==2'b11)
+                            res <= op_a & op_b;
+                        else
+                            err <= 1;
+                    end
+
+                    1: begin
+                        if(inp_valid==2'b11)
+                            res <= ~(op_a & op_b);
+                        else
+                            err <= 1;
+                    end
+
+                    2: begin
+                        if(inp_valid==2'b11)
+                            res <= op_a | op_b;
+                        else
+                            err <= 1;
+                    end
+
+                    3: begin
+                        if(inp_valid==2'b11)
+                            res <= ~(op_a | op_b);
+                        else
+                            err <= 1;
+                    end
+
+                    4: begin
+                        if(inp_valid==2'b11)
+                            res <= op_a ^ op_b;
+                        else
+                            err <= 1;
+                    end
+
+                    5: begin
+                        if(inp_valid==2'b11)
+                            res <= ~(op_a ^ op_b);
+                        else
+                            err <= 1;
+                    end
+
+                    6: begin
+                        if(inp_valid[0])
+                            res <= ~op_a;
+                        else
+                            err <= 1;
+                    end
+
+                    7: begin
+                        if(inp_valid[1])
+                            res <= ~op_b;
+                        else
+                            err <= 1;
+                    end
+
+                    8: begin
+                        if(inp_valid[0])
+                            res[WIDTH-1:0] <= op_a >> 1;
+
+                        if(inp_valid[0]) begin 
+                            res[WIDTH-1:0] <= op_a >> 1;
+                            res[2*WIDTH-1:WIDTH] <= 0;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    9: begin
+                        if(inp_valid[0])
+                            res[WIDTH-1:0] <= op_a << 1;
+
+                        if(inp_valid[0]) begin
+                            res[WIDTH-1:0] <= op_a << 1;
+                            res[2*WIDTH-1:WIDTH] <= 0;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    10: begin
+                        if(inp_valid[1])
+                            res[WIDTH-1:0] <= op_b >> 1;
+
+                        if(inp_valid[1]) begin
+                            res[WIDTH-1:0] <= op_b >> 1;
+                            res[2*WIDTH-1:WIDTH] <= 0;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    11: begin
+                        if(inp_valid[1])
+                            res[WIDTH-1:0] <= op_b << 1;
+
+                        if(inp_valid[1]) begin
+                            res[WIDTH-1:0] <= op_b << 1;
+                            res[2*WIDTH-1:WIDTH] <= 0;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    12: begin
+                        if (inp_valid==2'b11) begin
+                            res[WIDTH-1:0] <= op_a << op_b[$clog2(WIDTH)-1:0] |
+                                               op_a >> (WIDTH - op_b[$clog2(WIDTH)-1:0]);
+
+                            if (|op_b[WIDTH-1:$clog2(WIDTH)+1]) begin
+                                err <= 1;
+                            end
+
+                            res[2*WIDTH-1:WIDTH] <= 0;
+                        end
+                        else
+                            err <= 1;
+                    end
+
+                    13: begin
+                        if(inp_valid==2'b11) begin
+                            res[WIDTH-1:0] <= op_a >> op_b[$clog2(WIDTH)-1:0] |
+                                               op_a << (WIDTH - op_b[$clog2(WIDTH)-1:0]);
+
+                            if (|op_b[WIDTH-1:$clog2(WIDTH)+1]) begin
+                                err <= 1;
+                            end
+
+                            res[2*WIDTH-1:WIDTH] <= 0;
+                        end
+                        else
+                            err <= 1;
+                    end
+                endcase
+            end
+        end
     end
-    else if (CE)
-    begin
-      if(MODE && (CMD==4'b1001)&&(INP_VALID==2'b11))
-      begin
-        pipe1_OPA_9<=OPA;
-        pipe1_OPB_9<=OPB;
-        pipe1_valid_9<=1'b1;
-      end
-      else
-        pipe1_valid_9<=1'b0;
-      if (MODE && (CMD==4'b1010) && (INP_VALID==2'b11))
-      begin
-        pipe1_OPA_10<=OPA;
-        pipe1_OPB_10<=OPB;
-        pipe1_valid_10<=1'b1;
-      end
-      else
-        pipe1_valid_10<=1'b0;
-      if(pipe1_valid_9)
-      begin
-        pipe2_product_9<=pipe1_OPA_9*pipe1_OPB_9;
-        pipe2_valid_9<=1'b1;
-      end
-      else
-        pipe2_valid_9<=1'b0;
-      if(pipe1_valid_10)
-      begin
-        pipe2_product_10<=(pipe1_OPA_10<< 1)*pipe1_OPB_10;
-        pipe2_valid_10<=1'b1;
-      end
-      else
-        pipe2_valid_10<=1'b0;
-      if(pipe2_valid_9)
-      begin
-        pipe3_product_9<=pipe2_product_9;
-        pipe3_valid_9<=1'b1;
-      end
-      else
-        pipe3_valid_9<=1'b0;
-      if(pipe2_valid_10)
-      begin
-        pipe3_product_10<=pipe2_product_10;
-        pipe3_valid_10<=1'b1;
-      end
-      else
-        pipe3_valid_10<=1'b0;
+
+    always @(*) begin
+        if(mode && (cmd == 11)) begin
+            of = (op_a[WIDTH-1] == op_b[WIDTH-1]) &&
+                 (res[WIDTH-1] != op_a[WIDTH-1]); 
+        end
+        else if(mode && (cmd == 12)) begin
+            of = (op_a[WIDTH-1] != op_b[WIDTH-1]) &&
+                 (res[WIDTH-1] != op_a[WIDTH-1]);
+        end
+        else
+            of = 0;
     end
-  end
-  always@(posedge CLK or posedge RST)
-  begin
-    if(RST)
-    begin
-      RES<=0;
-      COUT<=1'b0;
-      OFLOW<=1'b0;
-      G<=1'b0;
-      E<=1'b0;
-      L<=1'b0;
-      ERR<=1'b0;
-    end
-    else if(CE)
-    begin
-      if(MODE)
-      begin
-        case(CMD)
-          4'b0000:
-          begin
-            if(INP_VALID==2'b11)
-              {COUT,RES} <= OPA+OPB;
-            else
-              ERR <= 1'b1;
-          end
-          4'b0001:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              OFLOW<= (OPA<OPB) ? 1 : 0;
-              RES<= OPA-OPB;
-            end
-            else
-              ERR <= 1'b1;
-          end
-          4'b0010:
-          begin
-            if(INP_VALID==2'b11)
-              {COUT,RES} <= OPA+OPB+CIN;
-            else
-              ERR<= 1'b1;
-          end
-          4'b0011:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              OFLOW<= (OPA<OPB) ? 1 : 0;
-              RES<= OPA-OPB-CIN;
-            end
-            else
-              ERR<= 1'b1;
-          end
-          4'b0100:
-          begin
-            if(INP_VALID==2'b01)
-              RES<= OPA+1;
-            else
-              ERR<= 1'b1;
-          end
-          4'b0101:
-          begin
-            if(INP_VALID==2'b01)
-              RES<= OPA-1;
-            else
-              ERR<= 1'b1;
-          end
-          4'b0110:
-          begin
-            if(INP_VALID==2'b10)
-              RES<= OPB+1;
-            else
-              ERR<= 1'b1;
-          end
-          4'b0111:
-          begin
-            if(INP_VALID==2'b10)
-              RES <= OPB-1;
-            else
-              ERR <= 1'b1;
-          end
-          4'b1000:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              RES <= 0;
-              if(OPA==OPB)
-              begin
-                E <= 1'b1;
-                G <= 1'b0;
-                L <= 1'b0;
-              end
-              else if(OPA>OPB)
-              begin
-                E <= 1'b0;
-                G <= 1'b1;
-                L <= 1'b0;
-              end
-              else
-              begin
-                E <= 1'b0;
-                G <= 1'b0;
-                L <= 1'b1;
-              end
-            end
-            else
-              ERR <= 1'b1;
-          end
-          4'b1001:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              if(pipe3_valid_9)
-                RES <= pipe3_product_9;
-            end
-            else
-              ERR <= 1'b1;
-          end
-          4'b1010:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              if(pipe3_valid_10)
-                RES <= pipe3_product_10;
-            end
-            else
-              ERR <= 1'b1;
-          end
-          4'b1011:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              RES<= s_OPA+s_OPB;
-              OFLOW<= (s_OPA[N-1]==s_OPB[N-1]) && ((SUM[N-1])!=s_OPA[N-1]);
-              E<= (s_OPA==s_OPB);
-              G<= (s_OPA>s_OPB);
-              L<= (s_OPA<s_OPB);
-            end
-            else
-              ERR<= 1'b1;
-          end
-          4'b1100:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              RES<=s_OPA-s_OPB;
-              OFLOW<=(s_OPA[N-1]!=s_OPB[N-1]) && ((DIFF[N-1])!=s_OPA[N-1]);
-              E<=(s_OPA==s_OPB);
-              G<=(s_OPA>s_OPB);
-              L<=(s_OPA<s_OPB);
-            end
-            else
-              ERR <= 1'b1;
-          end
-          default:
-          begin
-            RES<=0;
-            COUT<=1'b0;
-            OFLOW<=1'b0;
-            G<=1'b0;
-            E<=1'b0;
-            L<=1'b0;
-            ERR<=1'b0;
-          end
-        endcase
-      end
-      else
-      begin
-        RES<=0;
-        COUT<=1'b0;
-        OFLOW<=1'b0;
-        G<=1'b0;
-        E<=1'b0;
-        L<=1'b0;
-        ERR<=1'b0;
-        case(CMD)
-          4'b0000:
-          begin
-            if(INP_VALID==2'b11)
-              RES<=OPA&OPB;
-            else
-              ERR<=1'b1;
-          end
-          4'b0001:
-          begin
-            if(INP_VALID==2'b11)
-              RES<=~(OPA&OPB);
-            else
-              ERR<=1'b1;
-          end
-          4'b0010:
-          begin
-            if(INP_VALID==2'b11)
-              RES<=OPA|OPB;
-            else
-              ERR<=1'b1;
-          end
-          4'b0011:
-          begin
-            if(INP_VALID==2'b11)
-              RES<=~(OPA|OPB);
-            else
-              ERR<=1'b1;
-          end
-          4'b0100:
-          begin
-            if(INP_VALID==2'b11)
-              RES <= OPA^OPB;
-            else
-              ERR <= 1'b1;
-          end
-          4'b0101:
-          begin
-            if(INP_VALID==2'b11)
-              RES <= ~(OPA^OPB);
-            else
-              ERR <= 1'b1;
-          end
-          4'b0110:
-          begin
-            if(INP_VALID==2'b01)
-              RES <= ~OPA;
-            else
-              ERR <= 1'b1;
-          end
-          4'b0111:
-          begin
-            if(INP_VALID==2'b10)
-              RES <= ~OPB;
-            else
-              ERR <= 1'b1;
-          end
-          4'b1000:
-          begin
-            if(INP_VALID==2'b01)
-              RES <= OPA>>1;
-            else
-              ERR <= 1'b1;
-          end
-          4'b1001:
-          begin
-            if(INP_VALID==2'b01)
-              RES <= OPA<<1;
-            else
-              ERR <= 1'b1;
-          end
-          4'b1010:
-          begin
-            if(INP_VALID==2'b10)
-              RES <= OPB>>1;
-            else
-              ERR <= 1'b1;
-          end
-          4'b1011:
-          begin
-            if(INP_VALID==2'b10)
-              RES <= OPB<<1;
-            else
-              ERR <= 1'b1;
-          end
-          4'b1100:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              casex(OPB[7:0])
-                8'b0000_x000:RES<=OPA;
-                8'b0000_x001:RES<={OPA[N-2:0],OPA[N-1]};
-                8'b0000_x010:RES<={OPA[N-3:0],OPA[N-1:N-2]};
-                8'b0000_x011:RES<={OPA[N-4:0],OPA[N-1:N-3]};
-                8'b0000_x100:RES<={OPA[N-5:0],OPA[N-1:N-4]};
-                8'b0000_x101:RES<={OPA[N-6:0],OPA[N-1:N-5]};
-                8'b0000_x110:RES<={OPA[N-7:0],OPA[N-1:N-6]};
-                8'b0000_x111:RES<={OPA[N-8:0],OPA[N-1:N-7]};
-                default:;
-              endcase
-              ERR <= 1'b0;
-              if(OPB[7]|OPB[6]|OPB[5]|OPB[4])
-                ERR <= 1'b1;
-            end
-            else
-              ERR <= 1'b1;
-          end
-          4'b1101:
-          begin
-            if(INP_VALID==2'b11)
-            begin
-              casex(OPB[7:0])
-                8'b0000_x000:RES<=OPA;
-                8'b0000_x001:RES<={OPA[0],OPA[N-1:1]};
-                8'b0000_x010:RES<={OPA[1:0],OPA[N-1:2]};
-                8'b0000_x011:RES<={OPA[2:0],OPA[N-1:3]};
-                8'b0000_x100:RES<={OPA[3:0],OPA[N-1:4]};
-                8'b0000_x101:RES<={OPA[4:0],OPA[N-1:5]};
-                8'b0000_x110:RES<={OPA[5:0],OPA[N-1:6]};
-                8'b0000_x111:RES<={OPA[6:0],OPA[N-1:7]};
-                default:;
-              endcase
-              ERR <= 1'b0;
-              if(OPB[7]|OPB[6]|OPB[5]|OPB[4])
-                ERR <= 1'b1;
-            end
-            else
-              ERR <= 1'b1;
-          end
-          default:
-          begin
-            RES<=0;
-            COUT<=1'b0;
-            OFLOW<=1'b0;
-            G<=1'b0;
-            E<=1'b0;
-            L<=1'b0;
-            ERR<=1'b0;
-          end
-        endcase
-      end
-    end
-  end
+
 endmodule
